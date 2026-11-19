@@ -8,8 +8,9 @@
 //
 // On failure the API answers { error: "message" }; we throw that message so the page can show it.
 
-// Where apps/api runs; set VITE_API_URL to point the shop elsewhere.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Empty means same origin: in dev, Vite forwards /api and /uploads to the API (see vite.config.js).
+// Set VITE_API_URL only when the built shop is served apart from the API.
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Send one request and return its JSON body, or throw the API's error message.
 async function request(path, options) {
@@ -47,7 +48,7 @@ export function placeOrder({ cat_id, customer_name, phone, email, comment }) {
   });
 }
 
-// Uploaded photos come back as "/uploads/x.jpg", served by the API, so prefix the API address.
+// Uploaded photos come back as "/uploads/x.jpg", served by the API, so prefix the API address if any.
 export function photoUrl(photo_url) {
   if (!photo_url) return '';
   return photo_url.startsWith('/') ? API_BASE_URL + photo_url : photo_url;
