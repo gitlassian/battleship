@@ -20,6 +20,9 @@ npm run dev:shop    # http://localhost:5173
 npm run dev:admin   # http://localhost:5174  (dev password: admin)
 ```
 
+The admin panel can also run without the API on an in-memory mock:
+`npm --prefix apps/admin run dev:mock`.
+
 Each app is a separate npm project; there is no root lockfile.
 
 ## Workflow
