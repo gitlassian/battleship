@@ -4,7 +4,7 @@ Online shop selling cats, with an admin panel.
 
 | App | Path | Port | Stack |
 |---|---|---|---|
-| API | `apps/api` | 3001 | Node 20, Express, SQLite |
+| API | `apps/api` | 3001 | Node 22.13+, Express, built-in node:sqlite |
 | Storefront | `apps/shop` | 5173 | React, Vite |
 | Admin panel | `apps/admin` | 5174 | React, Vite |
 
@@ -14,6 +14,7 @@ Both frontends proxy `/api` to the API on port 3001 (override with `API_URL`).
 
 ```sh
 npm run install:all
+npm --prefix apps/api run seed   # once: ~10 demo cats into apps/api/data.db
 npm run dev:api     # http://localhost:3001
 npm run dev:shop    # http://localhost:5173
 npm run dev:admin   # http://localhost:5174  (dev password: admin)
