@@ -158,10 +158,10 @@ function ReservationForm({ cat }) {
   return (
     <form onSubmit={submitReservation} className="order-form">
       <h3>Reserve {cat.name}</h3>
-      <label>Name <input name="customer_name" required value={customer.customer_name} onChange={updateField} /></label>
-      <label>Phone <input name="phone" type="tel" required value={customer.phone} onChange={updateField} /></label>
+      <label>Name <input name="customer_name" required minLength={2} maxLength={100} value={customer.customer_name} onChange={updateField} /></label>
+      <label>Phone <input name="phone" type="tel" required pattern="[+0-9 ()-]{7,20}" title="7-20 digits, may start with +" value={customer.phone} onChange={updateField} /></label>
       <label>Email <input name="email" type="email" required value={customer.email} onChange={updateField} /></label>
-      <label>Comment (optional) <textarea name="comment" rows="3" value={customer.comment} onChange={updateField} /></label>
+      <label>Comment (optional) <textarea name="comment" rows="3" maxLength={1000} value={customer.comment} onChange={updateField} /></label>
       {errorMessage && <p className="error">{errorMessage}</p>}
       <button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Reserve'}</button>
       <small>No payment now: we will call you to confirm.</small>
