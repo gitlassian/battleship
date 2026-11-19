@@ -53,15 +53,21 @@ export function photoUrl(photo_url) {
   return photo_url.startsWith('/') ? API_BASE_URL + photo_url : photo_url;
 }
 
-// Show 12500 price_cents as "$125.00".
+// Show 500000 price_cents as "5 000 ₽" (seed prices are whole rubles, so no kopecks).
+const priceFormat = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 });
 export function formatPrice(price_cents) {
-  return `$${(price_cents / 100).toFixed(2)}`;
+  return priceFormat.format(price_cents / 100);
 }
 
-// Show 14 age_months as "1 yr 2 mo".
+// "male" -> "кот", "female" -> "кошка".
+export function formatSex(sex) {
+  return { male: 'кот', female: 'кошка' }[sex] || sex;
+}
+
+// Show 14 age_months as "1 г. 2 мес.".
 export function formatAge(age_months) {
   const years = Math.floor(age_months / 12);
   const months = age_months % 12;
-  if (years === 0) return `${months} mo`;
-  return months === 0 ? `${years} yr` : `${years} yr ${months} mo`;
+  if (years === 0) return `${months} мес.`;
+  return months === 0 ? `${years} г.` : `${years} г. ${months} мес.`;
 }

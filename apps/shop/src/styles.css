@@ -18,3 +18,4 @@ a { color: #0645ad; }
 .order-form textarea { padding: 6px; font: inherit; }
 .cat-detail > .back { grid-column: 1 / -1; }
 .notice { font-weight: 600; color: #8a5a00; }
+.photo-placeholder { width: 100%; aspect-ratio: 4 / 3; border-radius: 6px; background: #f0ebe3; display: grid; place-items: center; font-size: 48px; }

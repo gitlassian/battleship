@@ -9,27 +9,30 @@
 //   Step 3. /thanks       ThanksPage  - the reservation went through; the order arrives in router state.
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { listAvailableCats, listBreeds, getCat, placeOrder, photoUrl, formatPrice, formatAge } from './api.js';
+import { listAvailableCats, listBreeds, getCat, placeOrder, photoUrl, formatPrice, formatAge, formatSex } from './api.js';
+
+// How a non-available cat's status reads on its page.
+const STATUS_LABELS = { reserved: 'забронирован(а)', sold: 'продан(а)' };
 
 // Sort choices shown in the catalog; the values are what GET /api/cats?sort= accepts.
 const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest' },
-  { value: 'price_asc', label: 'Price: low to high' },
-  { value: 'price_desc', label: 'Price: high to low' },
+  { value: 'newest', label: 'Сначала новые' },
+  { value: 'price_asc', label: 'Сначала дешевле' },
+  { value: 'price_desc', label: 'Сначала дороже' },
 ];
 
 export default function App() {
   return (
     <div className="page">
       <header className="site-header">
-        <Link to="/"><h1>Cat Shop</h1></Link>
+        <Link to="/"><h1>Магазин котиков</h1></Link>
       </header>
       <main>
         <Routes>
           <Route path="/" element={<CatalogPage />} />
           <Route path="/cats/:catId" element={<CatPage />} />
           <Route path="/thanks" element={<ThanksPage />} />
-          <Route path="*" element={<p>Page not found. <Link to="/">See all cats</Link></p>} />
+          <Route path="*" element={<p>Страница не найдена. <Link to="/">Все котики</Link></p>} />
         </Routes>
       </main>
     </div>
@@ -48,6 +51,12 @@ function useApi(loadData, inputs) {
     return () => { cancelled = true; };
   }, inputs); // eslint-disable-line react-hooks/exhaustive-deps
   return state;
+}
+
+// Cat photo, or a paw placeholder when the cat has none yet (seed cats have photo_url "").
+function CatPhoto({ cat }) {
+  if (!cat.photo_url) return <div className="photo-placeholder" role="img" aria-label={cat.name}>🐾</div>;
+  return <img src={photoUrl(cat.photo_url)} alt={cat.name} />;
 }
 
 // ---------- Step 1: catalog ----------
@@ -71,31 +80,31 @@ function CatalogPage() {
     <section>
       <div className="toolbar">
         <label>
-          Breed{' '}
+          Порода{' '}
           <select value={breed} onChange={(event) => changeParam('breed', event.target.value)}>
-            <option value="">All breeds</option>
+            <option value="">Все породы</option>
             {(breeds.data || []).map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </label>
         <label>
-          Sort{' '}
+          Сортировка{' '}
           <select value={sort} onChange={(event) => changeParam('sort', event.target.value)}>
             {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
       </div>
 
-      {cats.loading && <p>Loading cats…</p>}
-      {cats.errorMessage && <p className="error">Could not load cats: {cats.errorMessage}</p>}
-      {cats.data && cats.data.length === 0 && <p>No cats available right now.</p>}
+      {cats.loading && <p>Загружаем котиков…</p>}
+      {cats.errorMessage && <p className="error">Не удалось загрузить котиков: {cats.errorMessage}</p>}
+      {cats.data && cats.data.length === 0 && <p>Сейчас нет доступных котиков.</p>}
 
       <ul className="cat-grid">
         {(cats.data || []).map((cat) => (
           <li key={cat.id}>
             <Link className="cat-card" to={`/cats/${cat.id}`}>
-              <img src={photoUrl(cat.photo_url)} alt={cat.name} />
+              <CatPhoto cat={cat} />
               <strong>{cat.name}</strong>
-              <span>{cat.breed} · {cat.sex} · {formatAge(cat.age_months)}</span>
+              <span>{cat.breed} · {formatSex(cat.sex)} · {formatAge(cat.age_months)}</span>
               <span className="price">{formatPrice(cat.price_cents)}</span>
             </Link>
           </li>
@@ -111,21 +120,21 @@ function CatPage() {
   const { catId } = useParams();
   const cat = useApi(() => getCat(catId), [catId]);
 
-  if (cat.loading) return <p>Loading…</p>;
-  if (cat.errorMessage) return <p className="error">{cat.errorMessage}. <Link to="/">See all cats</Link></p>;
+  if (cat.loading) return <p>Загрузка…</p>;
+  if (cat.errorMessage) return <p className="error">{cat.errorMessage}. <Link to="/">Все котики</Link></p>;
 
   return (
     <section className="cat-detail">
-      <Link className="back" to="/">← All cats</Link>
-      <img src={photoUrl(cat.data.photo_url)} alt={cat.data.name} />
+      <Link className="back" to="/">← Все котики</Link>
+      <CatPhoto cat={cat.data} />
       <div>
         <h2>{cat.data.name}</h2>
-        <p>{cat.data.breed} · {cat.data.sex} · {formatAge(cat.data.age_months)}</p>
+        <p>{cat.data.breed} · {formatSex(cat.data.sex)} · {formatAge(cat.data.age_months)}</p>
         <p className="price">{formatPrice(cat.data.price_cents)}</p>
         <p>{cat.data.description}</p>
         {cat.data.status === 'available'
           ? <ReservationForm cat={cat.data} />
-          : <p className="notice">{cat.data.name} is already {cat.data.status}.</p>}
+          : <p className="notice">{cat.data.name} уже {STATUS_LABELS[cat.data.status] || cat.data.status}.</p>}
       </div>
     </section>
   );
@@ -157,14 +166,14 @@ function ReservationForm({ cat }) {
 
   return (
     <form onSubmit={submitReservation} className="order-form">
-      <h3>Reserve {cat.name}</h3>
-      <label>Name <input name="customer_name" required minLength={2} maxLength={100} value={customer.customer_name} onChange={updateField} /></label>
-      <label>Phone <input name="phone" type="tel" required pattern="[+0-9 ()-]{7,20}" title="7-20 digits, may start with +" value={customer.phone} onChange={updateField} /></label>
+      <h3>Забронировать: {cat.name}</h3>
+      <label>Имя <input name="customer_name" required minLength={2} maxLength={100} value={customer.customer_name} onChange={updateField} /></label>
+      <label>Телефон <input name="phone" type="tel" required pattern="[+0-9 ()-]{7,20}" title="7–20 цифр, можно начать с +" value={customer.phone} onChange={updateField} /></label>
       <label>Email <input name="email" type="email" required value={customer.email} onChange={updateField} /></label>
-      <label>Comment (optional) <textarea name="comment" rows="3" maxLength={1000} value={customer.comment} onChange={updateField} /></label>
+      <label>Комментарий (необязательно) <textarea name="comment" rows="3" maxLength={1000} value={customer.comment} onChange={updateField} /></label>
       {errorMessage && <p className="error">{errorMessage}</p>}
-      <button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Reserve'}</button>
-      <small>No payment now: we will call you to confirm.</small>
+      <button type="submit" disabled={sending}>{sending ? 'Отправляем…' : 'Забронировать'}</button>
+      <small>Оплата не нужна: мы позвоним, чтобы подтвердить.</small>
     </form>
   );
 }
@@ -173,12 +182,12 @@ function ReservationForm({ cat }) {
 
 function ThanksPage() {
   const order = useLocation().state?.order;
-  if (!order) return <p>Nothing reserved yet. <Link to="/">See all cats</Link></p>;
+  if (!order) return <p>Пока ничего не забронировано. <Link to="/">Все котики</Link></p>;
   return (
     <section>
-      <h2>Thank you, {order.customer_name}!</h2>
-      <p>{order.cat_name} is reserved for you (order #{order.id}). We will call you at {order.phone} to confirm.</p>
-      <Link to="/">Back to all cats</Link>
+      <h2>Спасибо, {order.customer_name}!</h2>
+      <p>{order.cat_name} забронирован(а) для вас (заказ №{order.id}). Мы позвоним по номеру {order.phone}, чтобы подтвердить.</p>
+      <Link to="/">Ко всем котикам</Link>
     </section>
   );
 }
