@@ -1,92 +1,103 @@
 // App.jsx: the cat-shop storefront.
 //
-// What it does: shows the cats for sale, lets a visitor filter by breed, open one cat,
-// and order it with name, phone and email.
+// What it does: shows the cats for sale, lets a visitor filter by breed and sort them,
+// open one cat, and reserve it (no online payment: the shop calls the customer back).
 //
-// Steps a visitor goes through:
-//   Step 1. CatList    - grid of available cats with a breed filter.
-//   Step 2. CatDetail  - one cat: photo, details, price, and the order form.
-//   Step 3. Thank-you  - the order went through; the cat is now reserved.
-//
-// Which screen shows is kept in state (no router): selectedCat is null on the list.
+// Pages a visitor goes through:
+//   Step 1. /             CatalogPage - grid of available cats, breed filter, sort.
+//   Step 2. /cats/:catId  CatPage     - one cat with the reservation form.
+//   Step 3. /thanks       ThanksPage  - the reservation went through; the order arrives in router state.
 import { useEffect, useState } from 'react';
-import { listAvailableCats, placeOrder, formatPrice, formatAge } from './api.js';
+import { Link, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { listAvailableCats, listBreeds, getCat, placeOrder, photoUrl, formatPrice, formatAge } from './api.js';
+
+// Sort choices shown in the catalog; the values are what GET /api/cats?sort= accepts.
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'price_asc', label: 'Price: low to high' },
+  { value: 'price_desc', label: 'Price: high to low' },
+];
 
 export default function App() {
-  const [selectedCat, setSelectedCat] = useState(null);
-  const [placedOrder, setPlacedOrder] = useState(null);
-
-  function backToList() {
-    setSelectedCat(null);
-    setPlacedOrder(null);
-  }
-
   return (
     <div className="page">
       <header className="site-header">
-        <h1 onClick={backToList}>Cat Shop</h1>
+        <Link to="/"><h1>Cat Shop</h1></Link>
       </header>
       <main>
-        {placedOrder ? (
-          <ThankYou cat={selectedCat} order={placedOrder} onDone={backToList} />
-        ) : selectedCat ? (
-          <CatDetail cat={selectedCat} onBack={backToList} onOrdered={setPlacedOrder} />
-        ) : (
-          <CatList onSelect={setSelectedCat} />
-        )}
+        <Routes>
+          <Route path="/" element={<CatalogPage />} />
+          <Route path="/cats/:catId" element={<CatPage />} />
+          <Route path="/thanks" element={<ThanksPage />} />
+          <Route path="*" element={<p>Page not found. <Link to="/">See all cats</Link></p>} />
+        </Routes>
       </main>
     </div>
   );
 }
 
-// ---------- Step 1: list of available cats ----------
-
-function CatList({ onSelect }) {
-  const [cats, setCats] = useState([]);
-  const [breedFilter, setBreedFilter] = useState('');
-  const [breedsSeen, setBreedsSeen] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
-
+// Run an API call when its inputs change; ignore a slow answer once the inputs moved on.
+function useApi(loadData, inputs) {
+  const [state, setState] = useState({ data: null, loading: true, errorMessage: '' });
   useEffect(() => {
-    let cancelled = false; // ignore a slow answer once the filter has changed again
-    setLoading(true);
-    setErrorMessage('');
-    listAvailableCats(breedFilter)
-      .then((foundCats) => {
-        if (cancelled) return;
-        setCats(foundCats);
-        // The API has no breeds endpoint, so collect breeds from the unfiltered list.
-        if (!breedFilter) setBreedsSeen([...new Set(foundCats.map((cat) => cat.breed))].sort());
-      })
-      .catch((error) => !cancelled && setErrorMessage(error.message))
-      .finally(() => !cancelled && setLoading(false));
+    let cancelled = false;
+    setState({ data: null, loading: true, errorMessage: '' });
+    loadData()
+      .then((data) => !cancelled && setState({ data, loading: false, errorMessage: '' }))
+      .catch((error) => !cancelled && setState({ data: null, loading: false, errorMessage: error.message }));
     return () => { cancelled = true; };
-  }, [breedFilter]);
+  }, inputs); // eslint-disable-line react-hooks/exhaustive-deps
+  return state;
+}
+
+// ---------- Step 1: catalog ----------
+
+function CatalogPage() {
+  // Filter and sort live in the URL (?breed=Siamese&sort=price_asc) so they survive back/refresh.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const breed = searchParams.get('breed') || '';
+  const sort = searchParams.get('sort') || 'newest';
+
+  const breeds = useApi(listBreeds, []);
+  const cats = useApi(() => listAvailableCats({ breed, sort }), [breed, sort]);
+
+  function changeParam(name, value) {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(name, value); else next.delete(name);
+    setSearchParams(next);
+  }
 
   return (
     <section>
-      <label className="filter">
-        Breed{' '}
-        <select value={breedFilter} onChange={(event) => setBreedFilter(event.target.value)}>
-          <option value="">All breeds</option>
-          {breedsSeen.map((breed) => <option key={breed} value={breed}>{breed}</option>)}
-        </select>
-      </label>
+      <div className="toolbar">
+        <label>
+          Breed{' '}
+          <select value={breed} onChange={(event) => changeParam('breed', event.target.value)}>
+            <option value="">All breeds</option>
+            {(breeds.data || []).map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </label>
+        <label>
+          Sort{' '}
+          <select value={sort} onChange={(event) => changeParam('sort', event.target.value)}>
+            {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      </div>
 
-      {loading && <p>Loading cats…</p>}
-      {errorMessage && <p className="error">{errorMessage}</p>}
-      {!loading && !errorMessage && cats.length === 0 && <p>No cats available right now.</p>}
+      {cats.loading && <p>Loading cats…</p>}
+      {cats.errorMessage && <p className="error">Could not load cats: {cats.errorMessage}</p>}
+      {cats.data && cats.data.length === 0 && <p>No cats available right now.</p>}
 
       <ul className="cat-grid">
-        {cats.map((cat) => (
+        {(cats.data || []).map((cat) => (
           <li key={cat.id}>
-            <button className="cat-card" onClick={() => onSelect(cat)}>
-              <img src={cat.photo_url} alt={cat.name} />
+            <Link className="cat-card" to={`/cats/${cat.id}`}>
+              <img src={photoUrl(cat.photo_url)} alt={cat.name} />
               <strong>{cat.name}</strong>
-              <span>{cat.breed} · {formatAge(cat.age_months)}</span>
+              <span>{cat.breed} · {cat.sex} · {formatAge(cat.age_months)}</span>
               <span className="price">{formatPrice(cat.price_cents)}</span>
-            </button>
+            </Link>
           </li>
         ))}
       </ul>
@@ -94,10 +105,35 @@ function CatList({ onSelect }) {
   );
 }
 
-// ---------- Step 2: one cat and the order form ----------
+// ---------- Step 2: one cat and the reservation form ----------
 
-function CatDetail({ cat, onBack, onOrdered }) {
-  const [customer, setCustomer] = useState({ customer_name: '', phone: '', email: '' });
+function CatPage() {
+  const { catId } = useParams();
+  const cat = useApi(() => getCat(catId), [catId]);
+
+  if (cat.loading) return <p>Loading…</p>;
+  if (cat.errorMessage) return <p className="error">{cat.errorMessage}. <Link to="/">See all cats</Link></p>;
+
+  return (
+    <section className="cat-detail">
+      <Link className="back" to="/">← All cats</Link>
+      <img src={photoUrl(cat.data.photo_url)} alt={cat.data.name} />
+      <div>
+        <h2>{cat.data.name}</h2>
+        <p>{cat.data.breed} · {cat.data.sex} · {formatAge(cat.data.age_months)}</p>
+        <p className="price">{formatPrice(cat.data.price_cents)}</p>
+        <p>{cat.data.description}</p>
+        {cat.data.status === 'available'
+          ? <ReservationForm cat={cat.data} />
+          : <p className="notice">{cat.data.name} is already {cat.data.status}.</p>}
+      </div>
+    </section>
+  );
+}
+
+function ReservationForm({ cat }) {
+  const navigate = useNavigate();
+  const [customer, setCustomer] = useState({ customer_name: '', phone: '', email: '', comment: '' });
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -105,50 +141,44 @@ function CatDetail({ cat, onBack, onOrdered }) {
     setCustomer({ ...customer, [event.target.name]: event.target.value });
   }
 
-  async function submitOrder(event) {
+  async function submitReservation(event) {
     event.preventDefault();
     setSending(true);
     setErrorMessage('');
     try {
-      onOrdered(await placeOrder({ cat_id: cat.id, ...customer }));
+      const order = await placeOrder({ cat_id: cat.id, ...customer });
+      navigate('/thanks', { state: { order } });
     } catch (error) {
-      // e.g. someone else reserved this cat a moment ago
+      // e.g. 409: someone else reserved this cat a moment ago
       setErrorMessage(error.message);
       setSending(false);
     }
   }
 
   return (
-    <section className="cat-detail">
-      <button className="link" onClick={onBack}>← All cats</button>
-      <img src={cat.photo_url} alt={cat.name} />
-      <div>
-        <h2>{cat.name}</h2>
-        <p>{cat.breed} · {formatAge(cat.age_months)}</p>
-        <p className="price">{formatPrice(cat.price_cents)}</p>
-        <p>{cat.description}</p>
-
-        <form onSubmit={submitOrder} className="order-form">
-          <h3>Order {cat.name}</h3>
-          <label>Name <input name="customer_name" required value={customer.customer_name} onChange={updateField} /></label>
-          <label>Phone <input name="phone" type="tel" required value={customer.phone} onChange={updateField} /></label>
-          <label>Email <input name="email" type="email" required value={customer.email} onChange={updateField} /></label>
-          {errorMessage && <p className="error">{errorMessage}</p>}
-          <button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Place order'}</button>
-        </form>
-      </div>
-    </section>
+    <form onSubmit={submitReservation} className="order-form">
+      <h3>Reserve {cat.name}</h3>
+      <label>Name <input name="customer_name" required value={customer.customer_name} onChange={updateField} /></label>
+      <label>Phone <input name="phone" type="tel" required value={customer.phone} onChange={updateField} /></label>
+      <label>Email <input name="email" type="email" required value={customer.email} onChange={updateField} /></label>
+      <label>Comment (optional) <textarea name="comment" rows="3" value={customer.comment} onChange={updateField} /></label>
+      {errorMessage && <p className="error">{errorMessage}</p>}
+      <button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Reserve'}</button>
+      <small>No payment now: we will call you to confirm.</small>
+    </form>
   );
 }
 
-// ---------- Step 3: order confirmation ----------
+// ---------- Step 3: thank-you page ----------
 
-function ThankYou({ cat, order, onDone }) {
+function ThanksPage() {
+  const order = useLocation().state?.order;
+  if (!order) return <p>Nothing reserved yet. <Link to="/">See all cats</Link></p>;
   return (
     <section>
       <h2>Thank you, {order.customer_name}!</h2>
-      <p>{cat.name} is reserved for you. Order #{order.id}. We will contact you at {order.email}.</p>
-      <button onClick={onDone}>Back to all cats</button>
+      <p>{order.cat_name} is reserved for you (order #{order.id}). We will call you at {order.phone} to confirm.</p>
+      <Link to="/">Back to all cats</Link>
     </section>
   );
 }
