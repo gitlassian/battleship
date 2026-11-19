@@ -168,7 +168,7 @@ function ReservationForm({ cat }) {
     <form onSubmit={submitReservation} className="order-form">
       <h3>Забронировать: {cat.name}</h3>
       <label>Имя <input name="customer_name" required minLength={2} maxLength={100} value={customer.customer_name} onChange={updateField} /></label>
-      <label>Телефон <input name="phone" type="tel" required pattern="[+0-9 ()-]{7,20}" title="7–20 цифр, можно начать с +" value={customer.phone} onChange={updateField} /></label>
+      <label>Телефон <input name="phone" type="tel" required pattern="[0-9 \+\(\)\-]{7,20}" title="7–20 цифр, можно начать с +" value={customer.phone} onChange={updateField} /></label>
       <label>Email <input name="email" type="email" required value={customer.email} onChange={updateField} /></label>
       <label>Комментарий (необязательно) <textarea name="comment" rows="3" maxLength={1000} value={customer.comment} onChange={updateField} /></label>
       {errorMessage && <p className="error">{errorMessage}</p>}
