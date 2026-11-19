@@ -4,7 +4,7 @@ Online shop selling cats, with an admin panel.
 
 | App | Path | Port | Stack |
 |---|---|---|---|
-| API | `apps/api` | 3001 | Node 22.13+, Express, built-in `node:sqlite` |
+| API | `apps/api` | 3001 | Node 22.13+, Express, built-in node:sqlite |
 | Storefront | `apps/shop` | 5173 | React, Vite |
 | Admin panel | `apps/admin` | 5174 | React, Vite |
 
