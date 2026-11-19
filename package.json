@@ -1,0 +1,11 @@
+{
+  "name": "cat-shop",
+  "private": true,
+  "description": "Online shop selling cats, with an admin panel",
+  "scripts": {
+    "install:all": "npm --prefix apps/api install && npm --prefix apps/shop install && npm --prefix apps/admin install",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:shop": "npm --prefix apps/shop run dev",
+    "dev:admin": "npm --prefix apps/admin run dev"
+  }
+}
